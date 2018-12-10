@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+import math,csv
 import sympy
 from scipy.optimize import fsolve,root
 
@@ -25,28 +25,67 @@ def walk_model(t):
     S=v*t+A*np.sin(2*math.pi*t/T)
     return S
 
-#假设参考点p0=-35Hz,l0=0.6m
-def first_point_model():
-    x,y=sympy.symbols('x y')#x=d1,y=L
-    n=float(2)
-    p0=float(-35.0)
+#读取不同角度对应的信号强度值以及归一化
+def read_rssi_angel():
+    with open(r'D:\RFID_Experience\RFID_Human_Detection\RFID_Go_Out\925HzE_total_90.csv','r') as f:
+        csvfile=csv.reader(f)
+        angle=[]
+        rssi=[]
+        i=0
+        for row in csvfile:
+            if len(row)!=0:
+                if i==0:
+                    angle=row
+                    i=1
+                else:
+                    rssi=row
+                    for i in range(len(rssi)):
+                        rssi[i]=float(rssi[i])
+                    m=max(rssi)
+                    for i in range(len(rssi)):
+                        rssi[i]=rssi[i]-m
+        angle_rssi=dict(zip(angle,rssi))
+        return angle_rssi
+
+#先画出d1和d2对应L的一个表然后查表,d的范围为0-2m，L范围为-4m到4m
+def determine_a_point_model():
+    angle_rssi=read_rssi_angel()#提供角度和rssi的关系
+    p0=float(-35.0)#假设参考点p0=-35Hz,l0=0.6m
     d0=float(0.6)
-    s1 = float(0.002014)
-    s2 = float(0.0009455)
-    s3 = float(0.3127)
-    PA=float(-47.8)
-    PB=float(-53)
-    d=1
-    f=[p0-10*n*sympy.log(x/d0,10)-s1*sympy.root((180/sympy.pi)*sympy.atan(y/x),2)-s2*(180/sympy.pi)*sympy.atan(y/x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root(x,2)+sympy.root(y,2))/x,10)-PA,
-                        p0-10*n*sympy.log(d-x/d0,10)-s1*sympy.root((180/math.pi)*sympy.atan(y/d-x),2)-s2*(180/sympy.pi)*sympy.atan(y/d-x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root((d-x),2)+sympy.root(y,2))/d-x,10)-PB]
-    p=sympy.expand(f[0])
-    print(p)
-    q=sympy.expand(f[1])
-    print(q)
-    result=sympy.nonlinsolve([p,q],[x,y])
-    # result=fsolve(f,[1,1])
-    print(result[0][x])
-    return result
+    d=np.linspace(float(0),float(2),num=1000)
+    L=np.linspace(float(4),float(-4),num=1000)
+    P=[]
+    Q=[]
+    for i in range(len(d)):
+        P[i]=p0-10*2*math.log10(d[i]/d0)
+        for j in range(len(L)):
+            a=math.atan(L[j]/d[i])#得到角度之后与angle_rssi中的数据进行匹配
+            b=math.atan(L[j]/d-d[i])
+
+    return
+
+# #假设参考点p0=-35Hz,l0=0.6m
+# def first_point_model():
+#     x,y=sympy.symbols('x y')#x=d1,y=L
+#     n=float(2)
+#     p0=float(-35.0)
+#     d0=float(0.6)
+#     s1 = float(0.002014)
+#     s2 = float(0.0009455)
+#     s3 = float(0.3127)
+#     PA=float(-47.8)
+#     PB=float(-53)
+#     d=1
+#     f=[p0-10*n*sympy.log(x/d0,10)-s1*sympy.root((180/sympy.pi)*sympy.atan(y/x),2)-s2*(180/sympy.pi)*sympy.atan(y/x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root(x,2)+sympy.root(y,2))/x,10)-PA,
+#                         p0-10*n*sympy.log(d-x/d0,10)-s1*sympy.root((180/math.pi)*sympy.atan(y/d-x),2)-s2*(180/sympy.pi)*sympy.atan(y/d-x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root((d-x),2)+sympy.root(y,2))/d-x,10)-PB]
+#     p=sympy.expand(f[0])
+#     print(p)
+#     q=sympy.expand(f[1])
+#     print(q)
+#     result=sympy.nonlinsolve([p,q],[x,y])
+#     # result=fsolve(f,[1,1])
+#     print(result[0][x])
+#     return result
 
 
 # def f(x):
@@ -70,4 +109,5 @@ def no_block_model():
 
 if __name__ == '__main__':
     # no_block_model()
-    first_point_model()
+    # first_point_model()
+    determine_a_point_model()

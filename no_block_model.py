@@ -36,6 +36,8 @@ def read_rssi_angel():
             if len(row)!=0:
                 if i==0:
                     angle=row
+                    for i in range(len(angle)):
+                        angle[i]=int(angle[i])
                     i=1
                 else:
                     rssi=row
@@ -52,40 +54,73 @@ def determine_a_point_model():
     angle_rssi=read_rssi_angel()#提供角度和rssi的关系
     p0=float(-35.0)#假设参考点p0=-35Hz,l0=0.6m
     d0=float(0.6)
-    d=np.linspace(float(0),float(2),num=1000)
-    L=np.linspace(float(4),float(-4),num=1000)
+    d=float(2)
+    d1=np.linspace(float(0),float(2),num=1000).tolist()
+    L=np.linspace(float(4),float(-4),num=1000).tolist()
     P=[]
     Q=[]
-    for i in range(len(d)):
-        P[i]=p0-10*2*math.log10(d[i]/d0)
+    rssi_distance_dict={1 : 2}
+    for i in range(len(d1)):
+        if d1[i]==0 or d1[i]==d:
+            continue
+        else:
+            P.append(p0-10*2*math.log10(d1[i]/d0))
+            Q.append(p0 - 10 * 2 * math.log10((d-d1[i]) / d0))
         for j in range(len(L)):
-            a=math.atan(L[j]/d[i])#得到角度之后与angle_rssi中的数据进行匹配
-            b=math.atan(L[j]/d-d[i])
+            a=float(180)*math.atan(L[j]/d1[i])/math.pi#得到角度之后与angle_rssi中的数据进行匹配
+            b=-float(180)*math.atan(L[j]/(d-d1[i]))/math.pi
+            if isinstance(a,int):
+                if a%2==0:
+                    Pap=P[-1]+angle_rssi[a]
+                else:
+                    Pap=P[-1]+(angle_rssi[a-1]+angle_rssi[a+1])/2
+            else:
+                a=round(a)
+                if a%2==0:
+                    Pap=P[-1]+angle_rssi[a]
+                else:
+                    Pap=P[-1]+(angle_rssi[a-1]+angle_rssi[a+1])/2
+            Pam=Pap-10*2*math.log10(math.sqrt(d1[i]**2+L[j]**2)/d1[i])
+            if isinstance(b,int):
+                if b%2==0:
+                    Pbq=Q[-1]+angle_rssi[b]
+                else:
+                    Pbq=Q[-1]+(angle_rssi[b-1]+angle_rssi[b+1])/2
+            else:
+                b=round(b)
+                if b%2==0:
+                    Pbq=Q[-1]+angle_rssi[b]
+                else:
+                    Pbq=Q[-1]+(angle_rssi[b-1]+angle_rssi[b+1])/2
+            Pbm = Pbq - 10 * 2 * math.log10(math.sqrt((d-d1[i])**2+L[j]**2)/(d-d1[i]))
+            PM=[Pam,Pbm]
+            distance=[d1[i],L[j]]
+            rssi_distance_dict[PM[0],PM[1]]=[distance[0],distance[1]]
 
-    return
+    return rssi_distance_dict
 
-# #假设参考点p0=-35Hz,l0=0.6m
-# def first_point_model():
-#     x,y=sympy.symbols('x y')#x=d1,y=L
-#     n=float(2)
-#     p0=float(-35.0)
-#     d0=float(0.6)
-#     s1 = float(0.002014)
-#     s2 = float(0.0009455)
-#     s3 = float(0.3127)
-#     PA=float(-47.8)
-#     PB=float(-53)
-#     d=1
-#     f=[p0-10*n*sympy.log(x/d0,10)-s1*sympy.root((180/sympy.pi)*sympy.atan(y/x),2)-s2*(180/sympy.pi)*sympy.atan(y/x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root(x,2)+sympy.root(y,2))/x,10)-PA,
-#                         p0-10*n*sympy.log(d-x/d0,10)-s1*sympy.root((180/math.pi)*sympy.atan(y/d-x),2)-s2*(180/sympy.pi)*sympy.atan(y/d-x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root((d-x),2)+sympy.root(y,2))/d-x,10)-PB]
-#     p=sympy.expand(f[0])
-#     print(p)
-#     q=sympy.expand(f[1])
-#     print(q)
-#     result=sympy.nonlinsolve([p,q],[x,y])
-#     # result=fsolve(f,[1,1])
-#     print(result[0][x])
-#     return result
+#假设参考点p0=-35Hz,l0=0.6m
+def first_point_model():
+    x,y=sympy.symbols('x y')#x=d1,y=L
+    n=float(2)
+    p0=float(-35.0)
+    d0=float(0.6)
+    s1 = float(0.002014)
+    s2 = float(0.0009455)
+    s3 = float(0.3127)
+    PA=float(-47.8)
+    PB=float(-53)
+    d=float(2)
+    f=[p0-10*n*sympy.log(x/d0,10)-s1*sympy.root((180/sympy.pi)*sympy.atan(y/x),2)-s2*(180/sympy.pi)*sympy.atan(y/x)-s3-10*n*sympy.log(sympy.sqrt(sympy.root(x,2)+sympy.root(y,2))/x,10)-PA,
+                        p0-10*n*sympy.log((d-x)/d0,10)-s1*sympy.root((180/math.pi)*sympy.atan(y/(d-x)),2)-s2*(180/sympy.pi)*sympy.atan(y/(d-x))-s3-10*n*sympy.log(sympy.sqrt(sympy.root((d-x),2)+sympy.root(y,2))/(d-x),10)-PB]
+    p=sympy.expand(f[0])
+    print(p)
+    q=sympy.expand(f[1])
+    print(q)
+    result=sympy.nonlinsolve([p,q],[x,y])
+    # result=fsolve(f,[1,1])
+    print(result)
+    return result
 
 
 # def f(x):
@@ -110,4 +145,5 @@ def no_block_model():
 if __name__ == '__main__':
     # no_block_model()
     # first_point_model()
-    determine_a_point_model()
+    rssi_distance_dict=determine_a_point_model()
+    print(rssi_distance_dict)

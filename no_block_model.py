@@ -142,8 +142,16 @@ def first_point_model():
 def no_block_model():
     return
 
+def draw_path(rssi_distance_dict):
+    rssi=[(-60.83941293041388, -65.75890588312991),(-71.5,-58),(-71,-64.5),(-72,-63),(-72.5,-59)]
+    p=rssi[0]
+    q=rssi_distance_dict[rssi[0]]
+
+    return
+
 if __name__ == '__main__':
     # no_block_model()
     # first_point_model()
     rssi_distance_dict=determine_a_point_model()
     print(rssi_distance_dict)
+    draw_path(rssi_distance_dict)

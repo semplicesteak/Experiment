@@ -38,6 +38,10 @@ class one_antenna():
                     clear_RSSI.append(clear_row[0])
                     clear_time.append(clear_row[1])
                     clear_group.append(clear_row)
+                    if clear_time[0]=='\\Z':
+                        clear_time[0]=clear_time[1]
+                    if clear_time[-1]=='\\Z':
+                        clear_time[-1]=clear_time[-2]
                     self.origin_picture(clear_RSSI,clear_time,j,file_name[0])#画原始图像
                     self.denoising_picture(clear_RSSI,clear_time,j,file_name[0])#画去噪后的图像
                     row_stop = {'next'}
@@ -126,6 +130,20 @@ class double_antenna():
                     clear_RSSI2.append(clear_row[0])
                     clear_time2.append(clear_row[1])
                     clear_group2.append(clear_row)
+                    if clear_time1[0]=='\\Z':
+                        if clear_time1[1]<clear_time2[2]:
+                            clear_time1[0]=clear_time1[1]
+                        else:
+                            clear_time1[0] = clear_time2[1]
+                    if clear_time1[-1]=='\\Z':
+                        clear_time1[-1]=clear_time1[-2]
+                    if clear_time2[0]=='\\Z':
+                        if clear_time1[1]<clear_time2[2]:
+                            clear_time2[0]=clear_time1[1]
+                        else:
+                            clear_time2[0] = clear_time2[1]
+                    if clear_time2[-1]=='\\Z':
+                        clear_time2[-1]=clear_time2[-2]
                     self.origin_picture(clear_RSSI1,clear_time1,clear_RSSI2,clear_time2,j,file_name[0])#原图
                     self.denoising_picture(clear_RSSI1,clear_time1,clear_RSSI2,clear_time2,j,file_name[0])#小波图
                     row_stop = {'next'}
@@ -169,8 +187,10 @@ class double_antenna():
             for i in range(len(data2)):  # 将str类型变成float型
                 data2[i] = float(data2[i])
             WD=wavelet_denoising()
-            meta1=WD.wavelet_denosing_7_levels(data1)
-            meta2=WD.wavelet_denosing_7_levels(data2)
+            # meta1=WD.wavelet_denosing_7_levels(data1)
+            meta1 = WD.wavelet_denosing_6_levels(data1)
+            # meta2=WD.wavelet_denosing_7_levels(data2)
+            meta2 = WD.wavelet_denosing_6_levels(data2)
             meta1=meta1.tolist()
             meta2=meta2.tolist()
             meta1.insert(0, float('-80'))
@@ -210,19 +230,19 @@ class draw_picture():
     def visualization(self,data,time,name,picturedir):#1根天线
         time_list=[0]
         for i in range(1,len(time)):
-            time_list.append((int(time[i])-int(time[i-1])+time_list[i-1])/1000)
+            time_list.append((int(time[i])-int(time[i-1])+time_list[i-1]*1000)/1000)
         x=np.array(time_list)
         self.draw_pic(x,data,name,picturedir)
 
     def visualization_double_antenna(self,data1, time1, data2, time2, name,picturedir):  # 2根天线
         time_list1 = [0]
         for i in range(1, len(time1)):
-            time_list1.append(int(time1[i]) - int(time1[i - 1]) + time_list1[i - 1])
+            time_list1.append((int(time1[i]) - int(time1[i - 1]) + time_list1[i - 1]*1000)/1000)
         x1 = np.array(time_list1)
 
         time_list2 = [0]
         for i in range(1, len(time2)):
-            time_list2.append(int(time2[i]) - int(time2[i - 1]) + time_list2[i - 1])
+            time_list2.append((int(time2[i]) - int(time2[i - 1]) + time_list2[i - 1]*1000)/1000)
         x2 = np.array(time_list2)
 
         self.draw_pic_double_antenna(x1,data1,x2,data2,name,picturedir)
@@ -274,24 +294,41 @@ class wavelet_denoising():
             meta = meta[:-1]
         return meta
 
+    def wavelet_denosing_6_levels(self,data):
+        coeffs = pywt.wavedec(data, 'coif5', mode='symmetric',
+                              level=6)  # 将波分为6层，这行代码是一个参数是数据，第二个参数选择小波基这里选coif5，第三个点是模型默认是symmetric，第四个参数是分的层数
+        cA6, cD6, cD5, cD4, cD3, cD2, cD1 = coeffs
+        sD6 = pywt.threshold(cD6, 0.014, 'soft')
+        sD5 = pywt.threshold(cD5, 0.014, 'soft')
+        sD4 = pywt.threshold(cD4, 0.014, 'soft')
+        sD3 = pywt.threshold(cD3, 0.014, 'soft')
+        sD2 = np.zeros(len(cD2))
+        sD1 = np.zeros(len(cD1))
+        coeffs2 = [cA6, sD6, sD5, sD4, sD3, sD2, sD1]
+        meta = pywt.waverec(coeffs2, 'coif5')
+        if len(meta) > len(data):
+            meta = meta[:-1]
+        return meta
+
+
 if __name__ == '__main__':
-	#path1=r'seven_exp\recorddata_out1.csv'
-	#path2=r'sixth_exp\360测试.csv'
-	#path3=r'sixth_exp\360测试2.csv'
-	#path4=r'sixth_exp\半圆环垂直.csv'
-	#path5=r'sixth_exp\单天线摆手出门.csv'
-	#path6=r'sixth_exp\单天线不摆臂水平.csv'
-	#path7=r'sixth_exp\单天线非出门横走.csv'
-	#path8=r'sixth_exp\单天线水平摆手出门.csv'
-	#A1=one_antenna()
-	#A1.distribute_group(path1)
-	#A1.distribute_group(path2)
-	#A1.distribute_group(path3)
-	#A1.distribute_group(path4)
-	#A1.distribute_group(path5)
-	#A1.distribute_group(path6)
-	#A1.distribute_group(path7)
-	#A1.distribute_group(path8)
-	path1=r'F:\2018\行为识别实验\姿势无关的出入检测\Picture\eight_exp\recorddata_baibi4.csv'
-	A2=double_antenna()
-	A2.distribute_group(path1)
+    path1 = r'G:\PycharmPython\RFID_Human_Detection\recorddata_out1.csv'
+    #path1=r'seven_exp\recorddata_out1.csv'
+    #path2=r'sixth_exp\360测试.csv'
+    #path3=r'sixth_exp\360测试2.csv'
+    #path4=r'sixth_exp\半圆环垂直.csv'
+    #path5=r'sixth_exp\单天线摆手出门.csv'
+    #path6=r'sixth_exp\单天线不摆臂水平.csv'
+    #path7=r'sixth_exp\单天线非出门横走.csv'
+    #path8=r'sixth_exp\单天线水平摆手出门.csv'
+    # A1=one_antenna()
+    # A1.distribute_group(path1)
+    #A1.distribute_group(path2)
+    #A1.distribute_group(path3)
+    #A1.distribute_group(path4)
+    #A1.distribute_group(path5)
+    #A1.distribute_group(path6)
+    #A1.distribute_group(path7)
+    #A1.distribute_group(path8)
+    A2=double_antenna()
+    A2.distribute_group(path1)

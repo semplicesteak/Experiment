@@ -238,7 +238,7 @@ class draw_picture():
         plt.grid(True)
         # plt.gca().invert_yaxis()#将外轴坐标安从大到小排列
         self.detect_dir(picturedir)
-        path=picturedir+'/{0}.jpg'.format(name)
+        path=picturedir+'/{0}.png'.format(name)
         plt.savefig(path)
         plt.close()
 
@@ -252,7 +252,7 @@ class draw_picture():
         plt.legend(loc='best')
         plt.grid(True)
         self.detect_dir(picturedir)
-        path=picturedir+'/{0}.jpg'.format(name)
+        path=picturedir+'/{0}.png'.format(name)
         plt.savefig(path)
         plt.close()
 

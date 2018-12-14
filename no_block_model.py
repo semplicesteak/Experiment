@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import math,csv
+import math,csv,os,time
 import sympy
 from scipy.optimize import fsolve,root
 
@@ -27,7 +27,7 @@ def walk_model(t):
 
 #读取不同角度对应的信号强度值以及归一化
 def read_rssi_angel():
-    with open(r'D:\RFID_Experience\RFID_Human_Detection\RFID_Go_Out\925HzE_total_90.csv','r') as f:
+    with open(r'G:\PycharmPython\RFID_Human_Detection\RFID_Go_Out\925HzE_total_90.csv','r') as f:
         csvfile=csv.reader(f)
         angle=[]
         rssi=[]
@@ -56,10 +56,10 @@ def determine_a_point_model():
     d0=float(0.6)
     d=float(2)
     d1=np.linspace(float(0),float(2),num=1000).tolist()
-    L=np.linspace(float(4),float(-4),num=1000).tolist()
+    L=np.linspace(float(3),float(-3),num=1000).tolist()
     P=[]
     Q=[]
-    rssi_distance_dict={1 : 2}
+    rssi_distance=[]
     for i in range(len(d1)):
         if d1[i]==0 or d1[i]==d:
             continue
@@ -93,13 +93,16 @@ def determine_a_point_model():
                 else:
                     Pbq=Q[-1]+(angle_rssi[b-1]+angle_rssi[b+1])/2
             Pbm = Pbq - 10 * 2 * math.log10(math.sqrt((d-d1[i])**2+L[j]**2)/(d-d1[i]))
-            PM=[Pam,Pbm]
-            distance=[d1[i],L[j]]
-            rssi_distance_dict[PM[0],PM[1]]=[distance[0],distance[1]]
+            rssi_distance.append([Pam,Pbm,d1[i],L[j]])
+    if (os.path.exists(r'G:\PycharmPython\RFID_Human_Detection\RFID_Go_Out\RSSI_Distance.csv')):
+        os.remove(r'G:\PycharmPython\RFID_Human_Detection\RFID_Go_Out\RSSI_Distance.csv')
+    with open(r'G:\PycharmPython\RFID_Human_Detection\RFID_Go_Out\RSSI_Distance.csv', 'w') as file:
+        csvfile = csv.writer(file)
+        for i in range(len(rssi_distance)):
+            csvfile.writerow(rssi_distance[i])
+    return
 
-    return rssi_distance_dict
-
-#假设参考点p0=-35Hz,l0=0.6m
+#假设参考点p0=-35Hz,l0=0.6m,这种方法目前求不出非线性方程组的解暂时搁置
 def first_point_model():
     x,y=sympy.symbols('x y')#x=d1,y=L
     n=float(2)
@@ -142,16 +145,97 @@ def first_point_model():
 def no_block_model():
     return
 
-def draw_path(rssi_distance_dict):
-    rssi=[(-60.83941293041388, -65.75890588312991),(-71.5,-58),(-71,-64.5),(-72,-63),(-72.5,-59)]
-    p=rssi[0]
-    q=rssi_distance_dict[rssi[0]]
+# 该方法通过之前求出的表，用输入的点与表中所有点进行欧式距离计算找到距离最短的点
+def detect_distance(rssi_distance,rssi):
+    # rssi=[float(-60.5),float(-62)]#第四组
+    # rssi=[float(-58.5),float(-64)]#第五组
+    # rssi = [float(-61), float(-62.5)]  # 第六组
+    d_min=float(1000)
+    # distance=[]
+    for i in range(len(rssi_distance)):
+        rssi_distance[i]=[float(rssi_distance[i][0]),float(rssi_distance[i][1]),float(rssi_distance[i][2]),float(rssi_distance[i][3])]
+        d=math.sqrt((rssi_distance[i][0]-rssi[0])**2+(rssi_distance[i][1]-rssi[1])**2)
+        if d<d_min:
+            d_min=d
+            distance=rssi_distance[i]
+    print(distance)
+    distance2=[distance[2],distance[3]]
+    return distance2
+
+# 当数据中出现天线1和天线2交替出现时记录下两个天线的读数，带入上面求出的表查找距离，当有三个连续点的d1再+-0.4之间波动时认定他们走在一条直线上
+def detect_path(rssi_distance):
+    with open(r'G:\PycharmPython\RFID_Human_Detection\recorddata_baibi41.csv', 'r') as f:
+        csv_content=csv.reader(f)
+        headers = next(csv_content)
+        i = 0
+        all_row=[]
+        distance_row=[]
+        for row in csv_content:
+            if i == 1 and row[7][:4] != "stop":
+                all_row.append(row)
+                if row[4]!=all_row[-2][4] :
+                    if row[4]=="1" and abs(int(row[5])-int(all_row[-2][5]))<50000:#判断两个强度之间间隔时间不能太大
+                        distance_row.append([row[1],all_row[-2][1]])
+                    elif row[4]=="2" and abs(int(row[5])-int(all_row[-2][5]))<50000:
+                        distance_row.append([all_row[-2][1],row[1]])
+            if row[7][:5] == "start":
+                i = 1
+                all_row.append(row)
+                distance_row.append(['start','start'])
+            if row[7][:4] == "stop":
+                i = 0
+                all_row.append(row)
+                distance_row.append(['stop', 'stop'])
+        distance=[]
+        distance_group=[]
+
+        j=0
+        for q in range(len(distance_row)):
+            if distance_row[q]==["start","start"]:
+                continue
+            elif distance_row[q]==["stop","stop"]:
+                distance_group.append(distance)
+                plt.figure(figsize=(15, 10))
+                for p in range(2, len(distance)):  # 设置一个阈值，d1的波动范围在+-0.4之间
+                    if abs(distance[p][0] - distance[p - 1][0]) <= 0.4:
+                        if abs(distance[p][0] - distance[p - 2][0]) <= 0.4:
+                            if abs(distance[p - 1][0] - distance[p - 2][0]) <= 0.4:
+
+                                x=[distance[p-2][0],distance[p-1][0],distance[p][0]]
+                                y=[abs(distance[p-2][1]),abs(distance[p-1][1]),abs(distance[p][1])]
+                                plt.plot(x,y,'o-',label=j)
+                                plt.xlabel("d1")
+                                plt.ylabel("L")
+                                plt.title('lalala')
+                                j=j+1
+                plt.legend(loc='best')
+                plt.grid(True)
+                path = r'G:\PycharmPython\RFID_Human_Detection\RFID_Go_Out\picture\{0}.png'.format(q)
+                plt.savefig(path)
+                plt.close()
+            else:
+                distance.append(detect_distance(rssi_distance,[float(distance_row[q][0]),float(distance_row[q][1])]))
+
+
 
     return
+
 
 if __name__ == '__main__':
     # no_block_model()
     # first_point_model()
-    rssi_distance_dict=determine_a_point_model()
-    print(rssi_distance_dict)
-    draw_path(rssi_distance_dict)
+    # determine_a_point_model()
+    t1=time.time()
+    rssi_distance=[]
+    with open(r'G:\PycharmPython\RFID_Human_Detection\RFID_Go_Out\RSSI_Distance.csv', 'r') as file:
+        csvfile=csv.reader(file)
+        for row in csvfile:
+            if len(row)==0:
+                continue
+            rssi_distance.append(row)
+    # print(rssi_distance)
+    # detect_distance(rssi_distance)
+    detect_path(rssi_distance)
+    t2=time.time()
+    t=t2-t1
+    print(t)
